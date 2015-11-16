@@ -18,10 +18,13 @@ class DPP:
         params: parameters of the involved orthogonal polynomials
         """
         self.d = 2 # dimension
-        self.kernelName = kernelName
+        if not kernelName in ["Jacobi"]:
+            raise()
+        kernelName
         self.params = params
         self.numTrials = 10000 # number of trials in rejection sampling
         print(">> Initialized DPP")
+        
 
     def checkParams(self):
         """
@@ -35,14 +38,6 @@ class DPP:
         evaluate the kernel of the DPP
         """
         d = self.d
-        if self.kernelName == "Gaussian":
-            rho, alpha = self.params
-            return rho*np.exp(-npl.norm((x-y)/alpha)**2)
-        #elif self.kernelName == "newKernel":
-            # put your kernel here
-        else:
-            print("Error: undefined kernel")
-        
 
     def kernel_per_app(self, x, y):
         """
