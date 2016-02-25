@@ -3,28 +3,49 @@ import numpy.linalg as npl
 import numpy.random as npr
 import scipy.stats as spst
 import itertools as itt
-from tools import realify, schurInversion, rejectionSamplingWithUniformProposal # all the tools that are not dpp-specific
 import matplotlib.pyplot as plt
+from tools import schurInversion, rejectionSamplingWithUniformProposal 
 
 class DPP: 
     """
     implement a determinantal point process, with a method to sample from it
     """
 
-    def __init__(self, dimension, kernelName, params):
+    def __init__(self, dimension, params):
         """
         dimension: dimension of the ambient space
-        kernelName: sofar only "Jacobi" is implemented
-        params: parameters of the involved orthogonal polynomials
+        params: list of lists of parameters [[a1,b1], [a2,b2], ...] of the involved Jacobi polynomials
         """
-        self.d = 2 # dimension
-        if not kernelName in ["Jacobi"]:
-            raise()
-        kernelName
+        self.d = dimension
         self.params = params
         self.numTrials = 10000 # number of trials in rejection sampling
+        self.multiInd = np.zeros((N,2), int)
+        self.computeMultiIndices()
         print(">> Initialized DPP")
         
+
+    def computeMultiIndices(self):
+        """
+        compute multi indices
+        """
+        cpt1 = 1
+        cpt2 = 1
+        while cpt1<self.N:
+            for i in xrange(cpt2+1):
+                self.multiInd[cpt1,0] = cpt2
+                self.multiInd[cpt1,1] = i
+                cpt1 +=1
+                if cpt1==self.N:
+                    return
+            for i in xrange(cpt2):        
+                self.multiInd[cpt1,0] = cpt2-i-1
+                self.multiInd[cpt1,1] = cpt2
+                cpt1 +=1
+                if cpt1==self.N:
+                    return
+            cpt2 +=1   
+
+
 
     def checkParams(self):
         """
