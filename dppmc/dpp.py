@@ -22,37 +22,12 @@ class DPP:
         self.multiInd = np.zeros((N,2), int)
         self.computeMultiIndices()
         print(">> Initialized DPP")
-        
-
-    def computeMultiIndices(self):
-        """
-        compute multi indices
-        """
-        cpt1 = 1
-        cpt2 = 1
-        while cpt1<self.N:
-            for i in xrange(cpt2+1):
-                self.multiInd[cpt1,0] = cpt2
-                self.multiInd[cpt1,1] = i
-                cpt1 +=1
-                if cpt1==self.N:
-                    return
-            for i in xrange(cpt2):        
-                self.multiInd[cpt1,0] = cpt2-i-1
-                self.multiInd[cpt1,1] = cpt2
-                cpt1 +=1
-                if cpt1==self.N:
-                    return
-            cpt2 +=1   
-
-
 
     def checkParams(self):
         """
         check that the parameters are valid
         """
-        if self.kernelName == "Jacobi":
-            print("hey")
+        return 1
 
     def kernel(self, x, y):
         """

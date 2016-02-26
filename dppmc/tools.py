@@ -2,21 +2,31 @@
 import numpy as np 
 import numpy.linalg as npl
 import numpy.random as npr
-import matplotlib as mpl
-import matplotlib.pyplot as plt
 import scipy.stats as spst
+import math
 import itertools as itt
-# Change the size of labels on figures
-plt.rc('axes', labelsize=22)
-plt.rc('legend', fontsize=22)
 
-def realify(z):
+class GradedOrder():
     """
-    set z to its real part and raise a flag ig imag part is large
+    create an iterator for the graded lexicographic of order up to N in dimension d
     """
-    if np.imag(z)>1e-5:
-        print "Error: nonzero imaginary part", "Im(z)=", np.imag(z)
-    return np.real(z)
+    def __init__(self, N, d):
+        self.N = N
+        self.d = d
+        self.cpt = 0
+        M = math.ceil(N**(1./d))
+        L = ["itt.filterfalse(lambda x: not "+str(m)+"-1 in x, itt.product(range("+str(m)+"), repeat="+str(d)+"))" for m in range(1,M+1)] # The use of strings is to avoid lazy interpretation of m being an issue
+        self.it = itt.chain(*[eval(l) for l in L])
+        # We concatenate a list of iterators, one for each onion layer, lexicographically ordered
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        self.cpt += 1
+        if self.cpt>self.N:
+            raise StopIteration
+        return self.it.__next__()
 
 def schurInversion(A, B, C, invD):
     """
@@ -50,7 +60,7 @@ def rejectionSamplingWithUniformProposal(f, Z, d, maxTrials=1000):
         u = npr.rand()
         fStar = f(xStar)
         if fStar/M > 1:
-            print "Error: bound in rejection sampling is incorrect"
+            print("Error: bound in rejection sampling is incorrect")
         if u < fStar/M:
             accepted = 1
         cpt += 1
