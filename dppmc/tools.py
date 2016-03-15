@@ -1,10 +1,21 @@
-# Import necessary libraries, basically random number generators, linear algebra, and plotting tools
-import numpy as np 
+import numpy as np
 import numpy.linalg as npl
 import numpy.random as npr
 import scipy.stats as spst
 import math
 import itertools as itt
+import ctypes
+import os
+dll_name = "myJacobiPoly.so"
+dllabspath = os.path.dirname(os.path.abspath(__file__)) + os.path.sep + dll_name
+print("Loading", dllabspath)
+_jacobi = ctypes.CDLL(dllabspath)
+_jacobi.jacobi.argtypes = (ctypes.c_int, ctypes.c_double, ctypes.c_double, ctypes.c_double)
+_jacobi.jacobi.restype = ctypes.c_double
+
+def jacobi(n, a, b, x):
+    #global _jacobi
+    return float(_jacobi.jacobi(ctypes.c_int(n), ctypes.c_double(a), ctypes.c_double(b), ctypes.c_double(x)))
 
 class GradedOrder():
     """
@@ -44,26 +55,29 @@ def schurInversion(A, B, C, invD):
     res[len(A):, len(A):] = invD + np.dot(np.dot(invDC, invS), BinvD)
     return res
 
-def rejectionSamplingWithUniformProposal(f, Z, d, maxTrials=1000):
+def rejectionSamplingWithBetaProposal(f, Z, d, maxTrials=1000):
     """
     implements generic rejection sampling on [0,1]^d
     f: target pdf
-    Z: upper bound on f
+    Z: upper bound on f/q where q is Beta(.5,.5)**d
     d: dimension
     maxTrials: max number of steps in RS
     """
-    accepted = 0
+    failed = 0
     cpt = 0
     M = Z # this is an UB on f/q
-    while not accepted and cpt<maxTrials:
-        xStar = npr.rand(d)
+    while not failed and cpt<maxTrials:
+        xStar = 2*npr.beta(.5,.5,size=d).reshape((d,))-1
         u = npr.rand()
-        fStar = f(xStar)
+        fStar = f(xStar)*np.pi**d*np.prod(np.sqrt(1-xStar**2))
         if fStar/M > 1:
-            print("Error: bound in rejection sampling is incorrect")
+            print(fStar, M, xStar, "Error: bound in rejection sampling is incorrect")
+            failed = 1
+            break
         if u < fStar/M:
-            accepted = 1
+            break
         cpt += 1
-    if not accepted:
+    if failed:
         xStar = np.zeros(d)+1e-5*npr.randn()
-    return xStar, accepted
+    #print("numTrials", cpt)
+    return xStar, failed

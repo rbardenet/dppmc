@@ -3,197 +3,153 @@ import numpy.linalg as npl
 import numpy.random as npr
 import scipy.stats as spst
 import itertools as itt
+import pickle as pkl
 import matplotlib.pyplot as plt
-from tools import schurInversion, rejectionSamplingWithUniformProposal 
+import scipy.integrate as spi
+import scipy.special as sps
+from scipy.misc import logsumexp
+from tools import jacobi, GradedOrder, schurInversion, rejectionSamplingWithBetaProposal
 
-class DPP: 
+class DPP:
     """
     implement a determinantal point process, with a method to sample from it
     """
 
-    def __init__(self, dimension, params):
+    def __init__(self, N, dimension, listOfParams, jobId):
         """
         dimension: dimension of the ambient space
-        params: list of lists of parameters [[a1,b1], [a2,b2], ...] of the involved Jacobi polynomials
+        params: d-list of 2-lists of parameters [[a1,b1], [a2,b2], ...] of the involved Jacobi polynomials
         """
+        self.N = N
         self.d = dimension
-        self.params = params
+        self.a, self.b = zip(*listOfParams)
+        self.jobId = jobId
         self.numTrials = 10000 # number of trials in rejection sampling
-        self.multiInd = np.zeros((N,2), int)
-        self.computeMultiIndices()
+        self.squaredNormsOfPolys = {} # keys will be multiindices
+        self.computeSquaredNormsOfPolys()
+        self.logZ = 0
+
+        self.checkParams()
+        print(">> Computing Chow's bound")
+        self.computeChowsBound() # uniform bound on base measure times diagonal kernel, useful for rejection sampling later
+
         print(">> Initialized DPP")
 
     def checkParams(self):
         """
         check that the parameters are valid
         """
+        a = np.array(self.a)
+        b = np.array(self.b)
+        if (a<-.5).any() or (a>.5).any() or (b<-.5).any() or (b>.5).any():
+            print("Error: our bounds in rejection sampling are invalid")
         return 1
 
-    def kernel(self, x, y):
+    def computeSquaredNormsOfPolys(self):
         """
-        evaluate the kernel of the DPP
+        compute L2 norms of all involved Jacobi polynomials, as we need orthonormal polynomials
         """
-        d = self.d
+        a, b = self.a, self.b
+        for k in GradedOrder(self.N, self.d):
+            self.squaredNormsOfPolys[k] = 1.0*np.prod([spi.quad(lambda x: (1-x)**a[i]*(1+x)**b[i]*jacobi(k[i],a[i],b[i],x)**2, -1, 1)[0] for i in range(self.d)])
 
-    def kernel_per_app(self, x, y):
+    def computeChowsBound(self):
         """
-        evaluate periodic approximate kernel, as defined in [LaMoRu12]
+        bound on w*K/q taken from [Chow, Gatteschi, and Wong, 1994]
+        this is useful for rejection sampling
+        TODO: implement in logsumexp style
         """
-        d = self.d
-        Phi = lambda k, u: np.exp(2*1j*np.pi*np.dot(k,u))
-        if self.kernelName == "Gaussian":
-             res = np.sum([self.phi(k)*Phi(k, x-y) for k in self.inds])
-             return realify(res)
-        else:
-            print "Error: undefined kernel"
+        a, b = self.a, self.b
+        res = []
+        for k in GradedOrder(self.N, self.d):
+            logacc = 0
+            for i in range(self.d):
+                #logacc = 0 # attention!
+                kk = k[i]
+                if kk == 0:
+                    cst = spi.quad(lambda x: (1-x)**a[i]*(1+x)**b[i], -1, 1)[0]
+                    logacc -= np.log(cst) # Phi_0^2 = 1/cst
+                    if not (a[i]==-.5 and b[i]==-.5):
+                        # We're not in the Chebyshev case
+                        mode = (b[i]-a[i])*1./(a[i]+b[i]+1)
+                        logacc += (a[i]+.5)*np.log(1-mode) + (b[i]+.5)*np.log(1+mode) + np.log(np.pi)
+                    else:
+                        # In the Chebyshev case, w/q = pi
+                        logacc += np.log(np.pi)
+                        #print("logacc", logacc)
+                else:
+                    # Use Chow et al's bound
+                    aa = min(a[i],b[i])
+                    bb = max(a[i],b[i])
+                    logacc += np.log(2) + sps.gammaln(kk+aa+bb+1) + sps.gammaln(kk+bb+1) - sps.gammaln(kk+aa+1) - sps.gammaln(kk+1) - 2*bb*np.log(kk+(aa+bb+1.)/2)
+                #print("ho", i, k, np.exp(logacc))
 
-    def compareKernels(self):
+            res.append(logacc)
+        self.logZ = logsumexp(res)
+
+    def CDKernel(self, x, y):
         """
-        compare real and approximate kernels
+        compute Christoffel-Darboux kernel
         """
-        nPlot = 30
-        y = np.linspace(-1.0, 1.0, nPlot)
-        rho, alpha = self.params
-        myLevels = np.arange(-rho*0.1,rho*1.1,rho/100.) # Colors on both plots should be comparable
-        cmap = "seismic" # play with matplotlib's colormaps...
-
-        # plot original kernel
-        plt.subplot(131)
-        Z = np.array([[self.kernel(np.array([0,0]), np.array([y[i], y[j]])) for j in range(nPlot)] for i in range(nPlot)])
-        plt.contourf(y, y, Z, levels=myLevels, cmap=cmap)
-        plt.title("Original kernel")
-
-        # plot approximate kernel
-        plt.subplot(132)
-        Z_approx = np.array([[self.kernel_per_app(np.array([0,0]), np.array([y[i], y[j]])) for j in range(nPlot)] for i in range(nPlot)])
-        plt.contourf(y, y, Z_approx, levels=myLevels, cmap=cmap)
-#        ax = plt.gca()
-#        ax.add_patch(patches.Rectangle((-.5, -.5), 1, 1, fill=False, linewidth=5, color="white"))
-        plt.title("approx. kernel")
-
-        # plot absolute difference with the same scale
-        plt.subplot(133)
-        plt.contourf(y, y, np.abs(Z-Z_approx), levels=myLevels, cmap=cmap)
-        plt.colorbar()
-        plt.axvline(.5, color='w', linewidth=3)
-        plt.axvline(-.5, color='w', linewidth=3)
-        plt.axhline(.5, color='w', linewidth=3)
-        plt.axhline(-.5, color='w', linewidth=3)
-
-#        ax = plt.gca()
-#        ax.vline()
-#       ax.add_patch(patches.Rectangle((-.5, -.5), 1, 1, fill=False, linewidth=5, color="white"))
-        plt.title("Absolute error")
-
-        plt.show()
-
-    def sampleBernoullis(self):
-        """
-        first step of DPP sampling, see [HoKrPeVi06]
-        """
-        d = self.d
-        if self.kernelName == "Gaussian":
-            eigs = [self.phi(k) for k in self.inds]
-            self.berns = npr.binomial(1,eigs)
-            self.N = np.sum(self.berns)
-            print ">> Sampled Bernoullis, number of ones is N=", self.N 
-        
-    def KTilde(self, x, y):
-        if self.kernelName == "Gaussian":
-            Phi = lambda k, u: np.exp(2*1j*np.pi*np.dot(k,u))
-        return np.sum([Phi(k, x-y) for k in self.inds[np.where(self.berns)]])
+        a, b = self.a, self.b
+        res = 0
+        for k in GradedOrder(self.N, self.d):
+            #print("in kernel", k, [(1-x[i])**(a[i]+.5)*(1+x[i])**(b[i]+.5)*np.pi*sps.jacobi(k[i],a[i],b[i],monic=1)(x[i])**2/(spi.quad(lambda t:(1-t)**(a[i])*(1+t)**(b[i])*sps.jacobi(k[i],a[i],b[i],monic=1)(t)**2, -1,1)[0]) for i in range(self.d)])
+            
+            inc = np.prod([jacobi(k[i],a[i],b[i],x[i])*jacobi(k[i],a[i],b[i],y[i]) for i in range(self.d)])
+            inc /= self.squaredNormsOfPolys[k]
+            #print("inc", self.w(x)*np.pi**2*np.prod(np.sqrt(1-x**2))*inc)
+            res += inc
+        return res
 
     def w(self, x):
         """
-        base measure is the indicator of [0,1]^d
+        pdf of base measure
         """
-        return 1.*np.all(x>0)*np.all(x<1)
-    
+        a, b = self.a, self.b
+        return np.prod([(1-x[i])**a[i]*(1+x[i])**b[i] for i in range(self.d)])
+
     def sample(self):
         N = self.N
         d = self.d
         self.X = np.zeros((N, d))
-        K = lambda x,y: self.KTilde(x, y)
-        f = lambda x: realify(K(x,x))*self.w(x)/N # initialize to intensity measure
-        diagK = np.zeros((N,))
-        
-        # Draw the first point from the intensity measure
-        print "Sampling the", N, "th point"
+        K = lambda x,y: self.CDKernel(x, y)
+        f = lambda x: K(x,x)*self.w(x)/N # initialize to intensity measure
 
-        self.X[N-1,:], success = rejectionSamplingWithUniformProposal(f, 1., d, self.numTrials) # 1. is an upper bound on f
+        # Draw the first point from the intensity measure
+        print("Sampling the", N, "th point")
+        self.X[N-1,:], failed = rejectionSamplingWithBetaProposal(f, 1./N*np.exp(self.logZ), d, self.numTrials) # 1. is an upper bound on f
+        if failed:
+            print("failed RS")
         D = np.array([(K(self.X[N-1,:], self.X[N-1,:]))]).reshape((1,1))
         invK = npl.inv(D)
-        
+
         # Draw all subsequent points from the right conditional
         for i in reversed(range(N-1)):
- 
-            if not np.mod(i, N/5):
-                # from time to time print where we are in the loop
-                print "Sampling the", i, "th point"
-            
+            #if not np.mod(i, N/5):
+            # from time to time print where we are in the loop
+            print("Sampling the", i+1, "th point")
+
             # Define conditional
             xx = [self.X[j,:] for j in range(i+1,N)]
+            #print("hey", xx)
 
-            f = lambda x:  1.0/(i+1)* realify( K(x,x) - np.dot(np.array(map(lambda y: K(y,x), xx)).reshape((1,N-i-1)), np.dot(np.conjugate(invK), \
-                                                                np.array(map(lambda y: K(x,y), xx)).reshape((N-i-1,1))) ) )*self.w(x) # this comes from the normal equations
-                                                    
+            def f(x):
+                kk = np.array(list(map(lambda y: K(y,x), xx))).reshape((1,N-i-1))
+                return 1.0/(i+1)*(K(x,x) - np.dot(kk, np.dot(invK, kk.T)))*self.w(x)
+
+            #f = lambda x:  1.0/(i+1)* ( K(x,x) - np.dot(np.array(list(map(lambda y: K(y,x), xx))).reshape((1,N-i-1)), np.dot(invK, \
+            #                np.array(list(map(lambda y: K(x,y), xx))).reshape((N-i-1,1)) ) ))*self.w(x) # this comes from the normal equations
+
             # Draw next point using rejection sampling
-            self.X[i,:], success = rejectionSamplingWithUniformProposal(f, N*1./(i+1), d, self.numTrials)
-            if not success:
-                print "Error: Rejection sampling failed"
-
-            # Save first conditional for later plotting
-            if i==N-2:
-                print "Saving the first conditional"
-                nPlot = 60
-                self.yPlotFirstCond = np.linspace(0., 1.0, nPlot)
-                self.ZPlotFirstCond = [f(np.array([self.yPlotFirstCond[ii], self.yPlotFirstCond[jj]])) for jj in range(nPlot) for ii in range(nPlot)]
-
-            # Save last conditional for later plotting
-            if i==0:
-                print "Saving the last conditional"
-                nPlot = 40
-                self.yPlotLastCond = np.linspace(0., 1.0, nPlot)
-                self.ZPlotLastCond = [f(np.array([self.yPlotLastCond[ii], self.yPlotLastCond[jj]])) for jj in range(nPlot) for ii in range(nPlot)]
+            self.X[i,:], failed = rejectionSamplingWithBetaProposal(f, 1./(i+1)*np.exp(self.logZ), d, self.numTrials)
+            if failed:
+                print("Error: Rejection sampling failed")
 
             # Use Schur inversion for computational efficiency
             C = np.array([K(self.X[i,:], self.X[j,:]) for j in range(i+1,N)]).reshape((N-i-1,1))
-            invK = schurInversion(np.array(K(self.X[i,:], self.X[i,:])).reshape((1,1)), C.T, np.conjugate(C), invK) # Beware that K is Hermitian, not symmetric
-                
-        print ">> Done"
+            invK = schurInversion(np.array(K(self.X[i,:], self.X[i,:])).reshape((1,1)), C.T, C, invK)
+        print(">> Done")
 
-    def plotConditionals(self):
-        """
-        plot first and last conditionals during sampling
-        """
-        cmap = "seismic"
-
-        # plot first conditional
-        plt.subplot(121)
-        yPlot = self.yPlotFirstCond
-        nPlot = len(yPlot)
-        ZPlot = self.ZPlotFirstCond
-        plt.contourf(yPlot, yPlot, np.array(ZPlot).reshape((nPlot,nPlot)), cmap=cmap, alpha=.8)
-        plt.colorbar()
-        plt.plot(self.X[-1,0], self.X[-1,1], 'o', markersize=8, color="lightgreen") # First point sampled
-        plt.plot(self.X[-2,0], self.X[-2,1], '*', markersize=22, color="yellow", markeredgewidth=2) # Second point sampled
-        plt.axvline(.25, color='black', linewidth=3, alpha=.5)
-        plt.axvline(.75, color='black', linewidth=3, alpha=.5)
-        plt.axhline(.25, color='black', linewidth=3, alpha=.5)
-        plt.axhline(.75, color='black', linewidth=3, alpha=.5)
-        
-        # plot last conditional
-        plt.subplot(122)
-        yPlot = self.yPlotLastCond
-        nPlot = len(yPlot)
-        ZPlot = self.ZPlotLastCond
-        plt.contourf(yPlot, yPlot, np.array(ZPlot).reshape((nPlot,nPlot)), cmap=cmap, alpha=.8)
-        plt.colorbar()
-        plt.plot(self.X[1:,0], self.X[1:,1], 'o', markersize=8, color="lightgreen") # Previous points sampled
-        plt.plot(self.X[0,0], self.X[0,1], '*', markersize=22, color="yellow", markeredgewidth=2) # Last point sampled
-        plt.axvline(.25, color='black', linewidth=3, alpha=.5)
-        plt.axvline(.75, color='black', linewidth=3, alpha=.5)
-        plt.axhline(.25, color='black', linewidth=3, alpha=.5)
-        plt.axhline(.75, color='black', linewidth=3, alpha=.5)
-        
-        plt.show()
+    def save(self):
+        pkl.dump(self, open(self.jobId+".pkl", "wb"))
