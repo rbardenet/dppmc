@@ -13,4 +13,8 @@ Then you need to compile a shared C library using
 ```
 gcc -shared -o myJacobiPoly.so myJacobiPoly.c
 ```
-You should now be able to run the jupyter notebook examples.ipynb in dppmc/docs
+You should now be able to run the examples in dppmc/examples
+```
+cd examples
+python example1.py
+```
