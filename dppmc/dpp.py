@@ -7,6 +7,7 @@ import pickle as pkl
 import matplotlib.pyplot as plt
 import scipy.integrate as spi
 import scipy.special as sps
+import progressbar as pb
 from scipy.misc import logsumexp
 from tools import jacobi, GradedOrder, schurInversion, rejectionSamplingWithBetaProposal
 
@@ -30,10 +31,7 @@ class DPP:
         self.logZ = 0
 
         self.checkParams()
-        print(">> Computing Chow's bound")
         self.computeChowsBound() # uniform bound on base measure times diagonal kernel, useful for rejection sampling later
-
-        print(">> Initialized DPP")
 
     def checkParams(self):
         """
@@ -116,8 +114,9 @@ class DPP:
         K = lambda x,y: self.CDKernel(x, y)
         f = lambda x: K(x,x)*self.w(x)/N # initialize to intensity measure
 
+        numBarLevels = 20
+        bar = pb.ProgressBar(max_value=numBarLevels)
         # Draw the first point from the intensity measure
-        print("Sampling the", N, "th point")
         self.X[N-1,:], failed = rejectionSamplingWithBetaProposal(f, 1./N*np.exp(self.logZ), d, self.numTrials) # 1. is an upper bound on f
         if failed:
             print("failed RS")
@@ -126,9 +125,9 @@ class DPP:
 
         # Draw all subsequent points from the right conditional
         for i in reversed(range(N-1)):
+            bar.update(int((N-i)/N*numBarLevels))
             #if not np.mod(i, N/5):
             # from time to time print where we are in the loop
-            print("Sampling the", i+1, "th point")
 
             # Define conditional
             xx = [self.X[j,:] for j in range(i+1,N)]
@@ -149,7 +148,6 @@ class DPP:
             # Use Schur inversion for computational efficiency
             C = np.array([K(self.X[i,:], self.X[j,:]) for j in range(i+1,N)]).reshape((N-i-1,1))
             invK = schurInversion(np.array(K(self.X[i,:], self.X[i,:])).reshape((1,1)), C.T, C, invK)
-        print(">> Done")
-
+        
     def save(self):
         pkl.dump(self, open(self.jobId+".pkl", "wb"))
