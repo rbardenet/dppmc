@@ -15,6 +15,6 @@ gcc -shared -o myJacobiPoly.so myJacobiPoly.c
 ```
 You should now be able to run the examples
 ```
-cd examples
+cd dppmc/examples
 python example1.py
 ```
