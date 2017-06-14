@@ -5,12 +5,12 @@ This package implements sampling from multivariate orthonormal polynomial ensemb
 Monte Carlo with determinantal point processes, R. Bardenet and A. Hardy, [https://arxiv.org/abs/1605.00361]
 
 ## Installation instructions
-To install python dependencies, you can run
+Our instructions cover Unix systems. To install python dependencies, you can run
 ```
-pip install XXX
+pip install numpy==1.10.4 scipy==0.17.0 matplotlib==1.5.1 seaborn==0.7.1
 ```
-Then you need to compile a shared library using
-
+Then you need to compile a shared C library using
+```
 gcc -shared -o myJacobiPoly.so myJacobiPoly.c
-
+```
 You should now be able to run the jupyter notebook examples.ipynb in dppmc/docs
