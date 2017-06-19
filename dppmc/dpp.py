@@ -4,7 +4,6 @@ import numpy.random as npr
 import scipy.stats as spst
 import itertools as itt
 import pickle as pkl
-import matplotlib.pyplot as plt
 import scipy.integrate as spi
 import scipy.special as sps
 import progressbar as pb

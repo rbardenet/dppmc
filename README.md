@@ -7,7 +7,7 @@ This package implements sampling from multivariate orthonormal polynomial ensemb
 ## Installation instructions
 Our instructions cover Unix systems. To install python dependencies, you can run
 ```
-pip install numpy==1.10.4 scipy==0.17.0 matplotlib==1.5.1 seaborn==0.7.1
+pip install numpy==1.10.4 scipy==0.17.0 matplotlib==1.5.1 seaborn==0.7.1 pandas==0.20.2 progressbar2==3.30.2
 ```
 Then you need to compile a shared C library using
 ```
