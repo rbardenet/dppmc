@@ -4,12 +4,20 @@ This package implements sampling from multivariate orthonormal polynomial ensemb
 
 *Monte Carlo with determinantal point processes*, R. Bardenet and A. Hardy, [https://arxiv.org/abs/1605.00361]
 
-## Installation instructions
-Our instructions cover Unix systems. To install python dependencies, you can run
+## Prerequirements
+Our instructions cover Linux and Mac only. You need the [gcc](https://gcc.gnu.org/) C compiler installed. On Linux, it usually comes preinstalled. On Mac, you can now install it as part of the [XCode command line tools](https://developer.apple.com/xcode/), for which you need your apple ID. 
+
+## Install from sources
+Start by cloning this repository
 ```
-pip install numpy==1.10.4 scipy==0.17.0 matplotlib==1.5.1 seaborn==0.7.1 pandas==0.20.2 progressbar2==3.30.2
+git clone https://github.com/rbardenet/dppmc.git
+cd dppmc
 ```
-Then you need to compile a shared C library using
+then run `setup.py`, e.g.
+```
+pip install .
+```
+and compile the following shared C library
 ```
 gcc -shared -o myJacobiPoly.so myJacobiPoly.c
 ```
