@@ -5,7 +5,7 @@ This package implements sampling from multivariate orthonormal polynomial ensemb
 *Monte Carlo with determinantal point processes*, R. Bardenet and A. Hardy, [https://arxiv.org/abs/1605.00361]
 
 ## Prerequirements
-Our instructions cover Linux and Mac only. You need the [gcc](https://gcc.gnu.org/) C compiler installed. On Linux, it usually comes preinstalled. On Mac, you can install it as part of the [XCode command line tools](https://developer.apple.com/xcode/), for which you need your apple ID. 
+Our instructions cover Linux and Mac only. You need the [gcc](https://gcc.gnu.org/) C compiler installed. On Linux, it usually comes preinstalled. On Mac, you can install it as part of the [XCode command line tools](https://developer.apple.com/xcode/). 
 
 ## Install from sources
 Start by cloning this repository
