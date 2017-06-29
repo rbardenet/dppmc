@@ -13,7 +13,7 @@ Start by cloning this repository
 git clone https://github.com/rbardenet/dppmc.git
 cd dppmc
 ```
-then run `setup.py`, e.g.
+then run `setup.py`, e.g. using `pip`
 ```
 pip install .
 ```
