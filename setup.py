@@ -19,7 +19,7 @@ with open(path.join(here, 'README.md'), encoding='utf-8') as f:
     long_description = f.read()
 
 setup(
-    name='sample',
+    name='dppmc',
 
     # Versions should comply with PEP440.  For a discussion on single-sourcing
     # the version across setup.py and the project code, see
@@ -80,7 +80,7 @@ setup(
     # your project is installed. For an analysis of "install_requires" vs pip's
     # requirements files see:
     # https://packaging.python.org/en/latest/requirements.html
-    install_requires=['numpy==1.10.4 scipy==0.17.0 matplotlib==1.5.1 seaborn==0.7.1 pandas==0.20.2 progressbar2==3.30.2'],
+    install_requires=['numpy>=1.10.4', 'scipy>=0.17.0', 'matplotlib>=1.5.1', 'seaborn>=0.7.1', 'pandas>=0.20.2', 'progressbar2>=3.30.2'],
 
     # List additional groups of dependencies here (e.g. development
     # dependencies). You can install these using the following syntax,
